@@ -1,0 +1,42 @@
+{
+  "expo": {
+    "name": "Gym",
+    "slug": "gym-app",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "scheme": "gymapp",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.klinekraft.gymapp",
+      "infoPlist": {
+        "NSCameraUsageDescription": "We use the camera to scan food barcodes for macro tracking."
+      }
+    },
+    "android": {
+      "package": "com.klinekraft.gymapp",
+      "adaptiveIcon": {
+        "backgroundColor": "#0A0A0A"
+      },
+      "permissions": ["android.permission.CAMERA"]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/klinekraft-logo.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Gym to scan food barcodes."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
