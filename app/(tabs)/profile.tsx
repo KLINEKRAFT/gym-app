@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, Alert } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, ScrollView, StyleSheet, Pressable, Modal } from 'react-native';
 import { router } from 'expo-router';
 import { useAppStore, levelFromXp } from '../../lib/store';
 import { colors, spacing, radii } from '../../lib/tokens';
@@ -13,9 +13,45 @@ export default function ProfileTab() {
   const streakDays = useAppStore((s) => s.streakDays);
   const regenerate = useAppStore((s) => s.regenerate);
 
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [confirmRegenerate, setConfirmRegenerate] = useState(false);
+
   if (!profile || !macros) return null;
 
   const { level } = levelFromXp(xp);
+
+  // Bulletproof reset: clear persisted storage, reset every state slice
+  // explicitly, then navigate. Works on web and native — we don't rely on
+  // Alert.alert which has flaky behavior on iOS Safari.
+  const performReset = () => {
+    try {
+      useAppStore.persist.clearStorage();
+    } catch {
+      // Storage clear can fail silently on web — that's fine, the setState
+      // below still resets in-memory state.
+    }
+    useAppStore.setState({
+      profile: null,
+      weekPlan: null,
+      macros: null,
+      foodLog: [],
+      weightLog: [],
+      completedSets: [],
+      sessions: [],
+      currentSessionId: null,
+      streakDays: 0,
+      xp: 0,
+      todayDayIndex: 0,
+    });
+    setConfirmReset(false);
+    // Use replace so the user can't swipe back to the tabs after reset
+    router.replace('/onboarding');
+  };
+
+  const performRegenerate = () => {
+    regenerate();
+    setConfirmRegenerate(false);
+  };
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
@@ -70,47 +106,72 @@ export default function ProfileTab() {
       <Button
         label="regenerate plan"
         variant="outline"
-        onPress={() => {
-          regenerate();
-          Alert.alert('Plan regenerated', 'Your workout plan and macros have been refreshed.');
-        }}
+        onPress={() => setConfirmRegenerate(true)}
       />
 
       <Button
-        label="reset everything"
+        label="start over"
         variant="ghost"
-        onPress={() => {
-          Alert.alert(
-            'Reset?',
-            'This wipes your profile, plan, logs, and progress. Cannot be undone.',
-            [
-              { text: 'Cancel', style: 'cancel' },
-              {
-                text: 'Reset',
-                style: 'destructive',
-                onPress: () => {
-                  useAppStore.persist.clearStorage();
-                  useAppStore.setState({
-                    profile: null,
-                    weekPlan: null,
-                    macros: null,
-                    foodLog: [],
-                    weightLog: [],
-                    completedSets: [],
-                    streakDays: 0,
-                    xp: 0,
-                    todayDayIndex: 0,
-                  });
-                  router.replace('/onboarding');
-                },
-              },
-            ]
-          );
-        }}
+        onPress={() => setConfirmReset(true)}
         style={{ marginTop: spacing.xs }}
       />
 
       <KlinekraftFooter />
+
+      {/* ---------- Confirm reset modal ---------- */}
+      <Modal visible={confirmReset} animationType="fade" transparent>
+        <View style={styles.modalRoot}>
+          <View style={styles.modalSheet}>
+            <Eyebrow volt>// START OVER?</Eyebrow>
+            <Text style={styles.modalTitle}>this wipes everything.</Text>
+            <Text style={styles.modalBody}>
+              your profile, workout plan, macros, food log, weight log, and progress
+              will all be deleted. you'll be sent back to the welcome screen.
+            </Text>
+            <Text style={styles.modalBodyAccent}>
+              this cannot be undone.
+            </Text>
+
+            <Button
+              label="yes — start over"
+              onPress={performReset}
+              style={{ marginTop: spacing.lg }}
+            />
+            <Button
+              label="cancel"
+              variant="outline"
+              onPress={() => setConfirmReset(false)}
+              style={{ marginTop: spacing.sm }}
+            />
+          </View>
+        </View>
+      </Modal>
+
+      {/* ---------- Confirm regenerate modal ---------- */}
+      <Modal visible={confirmRegenerate} animationType="fade" transparent>
+        <View style={styles.modalRoot}>
+          <View style={styles.modalSheet}>
+            <Eyebrow volt>// REGENERATE PLAN?</Eyebrow>
+            <Text style={styles.modalTitle}>fresh week.</Text>
+            <Text style={styles.modalBody}>
+              this rebuilds your workout plan and recalculates your macros based on
+              your current profile. your logs and progress are preserved.
+            </Text>
+
+            <Button
+              label="regenerate"
+              onPress={performRegenerate}
+              style={{ marginTop: spacing.lg }}
+            />
+            <Button
+              label="cancel"
+              variant="outline"
+              onPress={() => setConfirmRegenerate(false)}
+              style={{ marginTop: spacing.sm }}
+            />
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -223,5 +284,48 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '900',
     color: colors.volt,
+  },
+
+  // ---------- Confirm modals ----------
+  modalRoot: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.lg,
+  },
+  modalSheet: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    borderRadius: radii.md,
+    padding: spacing.xl,
+    width: '100%',
+    maxWidth: 400,
+  },
+  modalTitle: {
+    fontSize: 32,
+    fontWeight: '900',
+    color: colors.text,
+    letterSpacing: -1,
+    textTransform: 'lowercase',
+    marginTop: spacing.sm,
+    lineHeight: 34,
+  },
+  modalBody: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.textMuted,
+    lineHeight: 20,
+    marginTop: spacing.md,
+  },
+  modalBodyAccent: {
+    fontFamily: 'Menlo',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 1.5,
+    color: colors.volt,
+    textTransform: 'uppercase',
+    marginTop: spacing.sm,
   },
 });
